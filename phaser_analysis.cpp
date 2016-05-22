@@ -28,8 +28,12 @@ struct project//单个项目
 	string symbol;
 	bool operator<(const project  &b)const //重载<运算符
 	{
-        if(this->end<b.end)// && this->start<b.end && this->dot<b.dot && this->symbol<b.symbol)
-        	return true;
+		char a_dot = (char)this->dot;
+		string str1 = this->start+this->end+this->symbol+a_dot;
+		char b_dot = (char)b.dot;
+		string str2 = b.start+b.end+b.symbol+b_dot;
+        if(str1 < str2)
+         	return true;
         return false;
     }
     bool operator==(const project  &b)const //重载==运算符
@@ -415,6 +419,36 @@ set<project> go_closure(string X , set<project> CI , vector<form> f , map<string
 	return result;
 }
 
+bool equal(set<project> a, set<project> b)
+{
+	if(a.size()!=b.size())
+		return false;
+	set<project>::iterator it1,it2;
+	it1=a.begin();
+	it2=b.begin();
+	for(;it1!=a.end();)
+	{
+		if((*it1).start!=(*it2).start)
+			return false;
+		else if((*it1).end!=(*it2).end)
+			return false;
+		else if((*it1).symbol!=(*it2).symbol)
+			return false;
+		else if((*it1).dot!=(*it2).dot)
+			return false;
+	}
+	return true;
+}
+
+bool contain(set<project> a, set<set<project> > b)
+{
+	set<set<project> >::iterator it;
+	for(it=b.begin();it!=b.end();it++)
+		if(equal((*it),a))
+			return true;
+	return false;
+}
+
 vector<map<string,int> > build_C(vector<form> f , map<string,set<string> > first , map<string,int> empty , set<string> vt , set<string> vn)//构造项目集族
 {
 	vector<map<string,int> > action;
@@ -449,6 +483,7 @@ vector<map<string,int> > build_C(vector<form> f , map<string,set<string> > first
 
 			if(set_C.find(J)==set_C.end())//新的
 			{
+				cout<<"i="<<i<<endl;
 				C.push_back(J);
 				set_C.insert(J);
 				if(vt.find(temp)!=vt.end())
@@ -465,7 +500,7 @@ vector<map<string,int> > build_C(vector<form> f , map<string,set<string> > first
 		action.push_back(buf_action);
 	}
 	set<project>::iterator it;
-	it=C[7].begin();
+	it=C[4].begin();
 	cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<"  dot="<<(*it).dot<<endl;
 	return action;
 }
