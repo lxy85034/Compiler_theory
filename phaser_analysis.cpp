@@ -27,8 +27,16 @@ struct project//单个项目
 	int dot;//表示项目中点的位置,初始为0
 	string symbol;
 	bool operator<(const project  &b)const //重载<运算符
-	{  
-        return (this->start<b.start);  
+	{
+        if(this->end<b.end)// && this->start<b.end && this->dot<b.dot && this->symbol<b.symbol)
+        	return true;
+        return false;
+    }
+    bool operator==(const project  &b)const //重载==运算符
+	{
+        if(this->end == b.end && this->start == b.end && this->dot == b.dot && this->symbol == b.symbol)
+        	return true;
+        return false;
     } 
 };
 
@@ -82,7 +90,7 @@ vector<string> split(const string str)
 	vector<string> result;
 	for(int i=0;i<str.size();i++)
 	{
-		string temp = str.substr((string::size_type)i,(string::size_type)(i+1));
+		string temp = str.substr((string::size_type)i,(string::size_type)(1));
 		result.push_back(temp);
 	}
 	return result;
@@ -110,7 +118,7 @@ set<string> find_vt(const vector<form> f)
 	{
 		for(int j=0;j<f[i].end.size();j++)
 		{
-			string temp = f[i].end.substr((string::size_type)j,(string::size_type)(j+1));
+			string temp = f[i].end.substr((string::size_type)j,(string::size_type)(1));
 			if(vn.find(temp)==vn.end())
 				vt.insert(temp);
 		}
@@ -233,7 +241,7 @@ map<string,int>  get_empty(const vector<form> v_value)//求能推出空的非终
 	// //测试empty表是否正确
 	// map<string,int>::iterator it;
 	// for(it=empty.begin();it!=empty.end();it++)
- // 	cout<<it->first<<":"<<it->second<<endl;
+	// cout<<it->first<<":"<<it->second<<endl;
 	return empty;
 }
 
@@ -336,43 +344,130 @@ string dot_right(string str,int dot)//获得右边第一个字符之后的串
 	dot++;
 	if(dot>=str.size())
 		return "";
-	string result;
-	result = str.substr((string::size_type)dot,str.npos);
-	return result;
+	return str.substr((string::size_type)dot,str.npos);
 }
 
 string dot_right_one(string str,int dot)//获得点右边第一个字符
 {
 	if(dot>=str.size())
 		return "";
-	string result;
-	result = str.substr((string::size_type)dot,(string::size_type)(dot+1));
+	return str.substr((string::size_type)dot,(string::size_type)(1));
+}
+
+set<project> make_closure(set<project> CI , vector<form> f , map<string,set<string> > first , map<string,int> empty)
+{
+	set<project> result;
+	result = CI;
+	if(result.size()==0)
+		return result;
+	set<project>::iterator pi;
+	bool flag = false;
+	for(pi=result.begin();pi!=result.end();pi++)
+	{
+		if(flag)
+			pi=result.begin();
+		int _size = result.size();
+		for(int i=0;i<f.size();i++)
+		{
+			//cout<<dot_right_one((*pi).end,(*pi).dot)<<endl;
+			if(f.at(i).start==dot_right_one((*pi).end,(*pi).dot))
+			{
+				set<string> buf = str_first(dot_right((*pi).end,(*pi).dot),(*pi).symbol,first,empty);
+				set<string>::iterator it;
+				for(it=buf.begin();it!=buf.end();it++)
+				{
+					project J;
+					J.start = dot_right_one((*pi).end,(*pi).dot);
+					J.end = f.at(i).end;
+					J.dot = 0;
+					J.symbol = (*it);
+					result.insert(J);
+					// cout<<J.start<<"->"<<J.end<<endl;
+					// cout<<"size:"<<result.size()<<endl;;
+				}
+			}
+		}
+		if(result.size()== _size)
+			break;
+		else
+			flag = true;
+	}
 	return result;
 }
 
-set<project> make_closure(project I , vector<form> f , map<string,set<string> > first , map<string,int> empty)
+set<project> go_closure(string X , set<project> CI , vector<form> f , map<string,set<string> > first , map<string,int> empty)
 {
 	set<project> result;
-	result.insert(I);
-	for(int i=0;i<f.size();i++)
+	set<project>::iterator it;
+	for(it=CI.begin();it!=CI.end();it++)
 	{
-		if(f.at(i).start==dot_right_one(I.end,I.dot))
+		if(dot_right_one((*it).end,(*it).dot)==X)
 		{
-			set<string> buf = str_first(dot_right(I.end,I.dot),I.symbol,first,empty);
-			set<string>::iterator it;
-			for(it=buf.begin();it!=buf.end();it++)
-			{
-				project J;
-				J.start = dot_right_one(I.end,I.dot);
-				J.end = f.at(i).end;
-				J.dot = 0;
-				J.symbol = (*it);
-				result.insert(J);
-			}
+			project J;
+			J.start = (*it).start;
+			J.end = (*it).end;
+			J.dot = (*it).dot+1;
+			J.symbol = (*it).symbol;
+			result.insert(J);
 		}
 	}
-
+	result = make_closure(result,f,first,empty);
 	return result;
+}
+
+vector<map<string,int> > build_C(vector<form> f , map<string,set<string> > first , map<string,int> empty , set<string> vt , set<string> vn)//构造项目集族
+{
+	vector<map<string,int> > action;
+	vector<set<project> > C;//项目集族
+	set<set<project> > set_C;
+	set<project> I0;
+	project I;
+	I.start="X";
+	I.dot=0;
+	I.end="S";
+	I.symbol="#";
+	I0.insert(I);
+	I0 = make_closure(I0,f,first,empty);//初始项目
+	C.push_back(I0);
+	set_C.insert(I0);
+
+	for(int i=0;i<C.size();i++)
+	{
+		set<string> buf;
+		map<string,int> buf_action;
+		set<project>::iterator it;
+		for(it=C.at(i).begin();it!=C.at(i).end();it++)
+		{
+			string temp = dot_right_one((*it).end,(*it).dot);
+			if(temp=="")
+				buf_action.insert(pair<string,int>((*it).symbol,-1));
+			if(buf.find(temp)!=buf.end())
+				continue;//已经跳转过,避免重复计算
+			buf.insert(temp);
+			set<project> J;
+			J = go_closure(temp,C.at(i),f,first,empty);
+
+			if(set_C.find(J)==set_C.end())//新的
+			{
+				C.push_back(J);
+				set_C.insert(J);
+				if(vt.find(temp)!=vt.end())
+					buf_action.insert(pair<string,int>(temp,C.size()-1));
+				it=C.at(i).begin();//vector内存重新分配之后会导致迭代器失效!
+			}
+			else
+			{
+				for(int j=0;j<C.size();j++)
+					if(C.at(j)==J)
+						buf_action.insert(pair<string,int>(temp,j));
+			}
+		}
+		action.push_back(buf_action);
+	}
+	set<project>::iterator it;
+	it=C[7].begin();
+	cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<"  dot="<<(*it).dot<<endl;
+	return action;
 }
 
 int main()
@@ -385,16 +480,39 @@ int main()
 	map<string,set<string> > first,follow,select;
 	first = make_first(vt,vn,v,empty);
 
-	project I;
-	I.start="X";
-	I.dot=0;
-	I.end="S";
-	I.symbol="#";
-	set<project> CI0 = make_closure(I,v,first,empty);
+	vector<map<string,int> > action;
+	vector<map<string,int> > go_to;
+	action = build_C(v, first, empty, vt, vn);
+	cout<<"size:"<<action.size()<<endl<<endl;
+	for(int i=0;i<action.size();i++)
+	{
+		cout<<"line:"<<i<<"   ";
+		map<string,int>::iterator it;
+	    for(it=action.at(i).begin();it!=action.at(i).end();++it)
+	    {
+	        cout<<"key: "<<it->first <<" value: "<<it->second<<endl;
+	    }
+	    cout<<endl;
+	}
 
-	set<project>::iterator it;
-	for(it=CI0.begin();it!=CI0.end();it++)
-		cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<":"<<(*it).dot<<endl;
+
+
+
+
+	// project I;
+	// I.start="X";
+	// I.dot=0;
+	// I.end="S";
+	// I.symbol="#";
+	// set<project> CI0;
+	// CI0.insert(I);
+	// CI0 = make_closure(CI0,v,first,empty);
+	// //CI0 = go_closure("b",CI0,v,first,empty);
+
+	// cout<<"main:"<<endl;
+	// set<project>::iterator it;
+	// for(it=CI0.begin();it!=CI0.end();it++)
+	// 	cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<":"<<(*it).dot<<endl;
 
 	// set<string>::iterator it;
 	// for(it=first["D"].begin();it!=first["D"].end();it++)
