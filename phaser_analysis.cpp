@@ -8,16 +8,28 @@
 #include "map"
 using namespace std;
 
-struct word
+struct word//token值
 {
 	int type;
 	string value;
 };
 
-struct form
+struct form//语法产生式
+{
+	string start;//产生式左部
+	string end;//产生式右部
+};
+
+struct project//单个项目
 {
 	string start;
 	string end;
+	int dot;//表示项目中点的位置,初始为0
+	string symbol;
+	bool operator<(const project  &b)const //重载<运算符
+	{  
+        return (this->start<b.start);  
+    } 
 };
 
 vector<word> read_token(char* file_path)
@@ -218,10 +230,10 @@ map<string,int>  get_empty(const vector<form> v_value)//求能推出空的非终
 			
 		}
 	}
-	//测试empty表是否正确
-	map<string,int>::iterator it;
-	for(it=empty.begin();it!=empty.end();it++)
- 	cout<<it->first<<":"<<it->second<<endl;
+	// //测试empty表是否正确
+	// map<string,int>::iterator it;
+	// for(it=empty.begin();it!=empty.end();it++)
+ // 	cout<<it->first<<":"<<it->second<<endl;
 	return empty;
 }
 
@@ -292,6 +304,77 @@ map<string,set<string> > make_first(const set<string> vt , const set<string> vn 
 	return result;
 }
 
+set<string> str_first(string str ,string symbol, map<string,set<string> > first , map<string,int> empty)
+{
+	set<string> result;
+	if(str == "")
+	{
+		result.insert(symbol);
+		return result;
+	}
+	vector<string> buf;
+	buf = split(str);
+	vector<string>::iterator it;
+	for(it=buf.begin();it!=buf.end();it++)
+	{
+		result = _union(result,(first[(string)(*it)]));
+		if(empty[(string)(*it)]==0)
+			break;
+	}
+	if(it==buf.end() && empty[(string)(*(it-1))]==1)
+		result.insert(symbol);
+	if(result.find("$")!=result.end())
+	{
+		result.erase("$");
+		result.insert("#");
+	}
+	return result;
+}
+
+string dot_right(string str,int dot)//获得右边第一个字符之后的串
+{
+	dot++;
+	if(dot>=str.size())
+		return "";
+	string result;
+	result = str.substr((string::size_type)dot,str.npos);
+	return result;
+}
+
+string dot_right_one(string str,int dot)//获得点右边第一个字符
+{
+	if(dot>=str.size())
+		return "";
+	string result;
+	result = str.substr((string::size_type)dot,(string::size_type)(dot+1));
+	return result;
+}
+
+set<project> make_closure(project I , vector<form> f , map<string,set<string> > first , map<string,int> empty)
+{
+	set<project> result;
+	result.insert(I);
+	for(int i=0;i<f.size();i++)
+	{
+		if(f.at(i).start==dot_right_one(I.end,I.dot))
+		{
+			set<string> buf = str_first(dot_right(I.end,I.dot),I.symbol,first,empty);
+			set<string>::iterator it;
+			for(it=buf.begin();it!=buf.end();it++)
+			{
+				project J;
+				J.start = dot_right_one(I.end,I.dot);
+				J.end = f.at(i).end;
+				J.dot = 0;
+				J.symbol = (*it);
+				result.insert(J);
+			}
+		}
+	}
+
+	return result;
+}
+
 int main()
 {
 	char s[] = "input_grammar.txt";
@@ -302,8 +385,19 @@ int main()
 	map<string,set<string> > first,follow,select;
 	first = make_first(vt,vn,v,empty);
 
-	set<string>::iterator it;
-	for(it=first["D"].begin();it!=first["D"].end();it++)
-		cout<<*it<<" ";
+	project I;
+	I.start="X";
+	I.dot=0;
+	I.end="S";
+	I.symbol="#";
+	set<project> CI0 = make_closure(I,v,first,empty);
+
+	set<project>::iterator it;
+	for(it=CI0.begin();it!=CI0.end();it++)
+		cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<":"<<(*it).dot<<endl;
+
+	// set<string>::iterator it;
+	// for(it=first["D"].begin();it!=first["D"].end();it++)
+	// 	cout<<*it<<" ";
 	return 0;
 }

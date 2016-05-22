@@ -1,10 +1,6 @@
-S->AB
-S->bC
-A->$
-A->b
-B->$
-B->aD
-C->AD
-C->b
-D->aS
-D->c
+X->S
+S->aAd
+S->bAc
+S->aec
+S->bed
+A->e
