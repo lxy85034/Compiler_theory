@@ -1,4 +1,13 @@
+int flag ;
+cin >> flag ;
+int sum = 0 ;
 for ( int i = 0 ; i < x ; i ++ )
 {
-	sum += x ;
+	if ( flag > 0 )
+		sum += x ;
+	else
+		sum -= x ;
 }
+double dd = 123.456547 ;
+cout << sum << endl ;
+cout << dd << endl ;

@@ -6,7 +6,12 @@
 #include "set"
 #include "vector"
 #include "map"
+#include "stack"
+#include "iomanip"
 using namespace std;
+
+#define MAX_W 100
+#define MAX_H 1000
 
 struct word//token值
 {
@@ -20,6 +25,25 @@ struct form//语法产生式
 	string end;//产生式右部
 };
 
+struct point
+{
+	string type;//类型:ACTION GOTO 归约 接受
+	int value;
+	string start;
+	string end;
+};
+
+struct table
+{
+	int w;//宽度
+	int h;//高度
+	point fx[MAX_H][MAX_W];
+	string head[MAX_W];
+	set<string> vv;//符号表
+};
+
+
+
 struct project//单个项目
 {
 	string start;
@@ -28,19 +52,27 @@ struct project//单个项目
 	string symbol;
 	bool operator<(const project  &b)const //重载<运算符
 	{
-		char a_dot = (char)this->dot;
-		string str1 = this->start+this->end+this->symbol+a_dot;
-		char b_dot = (char)b.dot;
-		string str2 = b.start+b.end+b.symbol+b_dot;
+		string str1,str2;
+		str1 = this->start + this->end + this->symbol;
+		str2 = b.start + b.end + b.symbol;
         if(str1 < str2)
-         	return true;
-        return false;
+        	return true;
+        else if(str1 > str2)
+        	return false;
+        else if(str1 == str2)
+        {
+        	if(this->dot < b.dot)
+        		return true;
+        	else
+        		return false;
+        }
     }
     bool operator==(const project  &b)const //重载==运算符
 	{
-        if(this->end == b.end && this->start == b.end && this->dot == b.dot && this->symbol == b.symbol)
+        if(this->end == b.end && this->start == b.start && this->dot == b.dot && this->symbol == b.symbol)
         	return true;
-        return false;
+        else
+        	return false;
     } 
 };
 
@@ -100,6 +132,17 @@ vector<string> split(const string str)
 	return result;
 }
 
+stack<string> str_stack(const string str)
+{
+	stack<string> result;
+	for(int i=str.size()-1;i>=0;i--)
+	{
+		string temp = str.substr((string::size_type)i,(string::size_type)(1));
+		result.push(temp);
+	}
+	return result;
+}
+
 set<string> find_vn(const vector<form> f)
 {
 	set<string> vn;
@@ -135,118 +178,125 @@ set<string> find_vt(const vector<form> f)
 map<string,int>  get_empty(const vector<form> v_value)//求能推出空的非终结符
 {
 	vector<form> v;
-	v = v_value;
-	map<string,int> empty;
-	set<string> vt = find_vt(v);
-	set<string> vn = find_vn(v);
-	set<string>::iterator it1;
-	for(it1=vn.begin();it1!=vn.end();it1++)
-		empty.insert(pair<string,int>((*it1),-1));
-	vector<form>::iterator it2;
-	for(it2=v.begin();it2!=v.end();it2++)//删除所有右部含有终结符的产生式
-	{
-		vector<string> right = split((*it2).end);//拆分产生式右部
-		int right_size = right.size();
-		bool flag = false;
-		for(int j=0;j<right_size;j++)
-			if(vt.find(right.at(j))!=vt.end())//产生式右部含有终结符
+    v = v_value;
+    map<string,int> empty;
+    set<string> vt = find_vt(v);
+    set<string> vn = find_vn(v);
+    set<string>::iterator it1;
+    for(it1=vn.begin();it1!=vn.end();it1++)
+        empty.insert(pair<string,int>((*it1),-1));
+    vector<form>::iterator it2;
+    for(it2=v.begin();it2!=v.end();it2++)//删除所有右部含有终结符的产生式
+    {
+        vector<string> right = split((*it2).end);//拆分产生式右部
+        int right_size = right.size();
+        int flag = 0;
+        for(int j=0;j<right_size;j++)
+        {
+        	if((string)right.at(j)==(*it2).start)//出现了递归情况
 			{
-				flag = true;
+				v.erase(it2);
+				it2--;
+				flag=2;
 				break;
 			}
-		if(flag)
-		{
-			int count = 0;
-			vector<form>::iterator it4;
-			for(it4=v.begin();it4!=v.end();it4++)
-				if((*it4).start==(*it2).start)
-					count++;
-			if(count == 1)
-				empty[(string)(*it2).start] = 0;
-			v.erase(it2);
-			it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
-		}
-		
-	}
-
-	for(it2=v.begin();it2!=v.end();it2++)
-	{
-		if((*it2).end=="$")
-		{
-			string temp = (*it2).start;
-			empty[(string)(*it2).start] = 1;//能推出空
-			vector<form>::iterator it3;
-			for(it3=v.begin();it3!=v.end();it3++)
-			{
-				if((*it3).start==temp)
-				{
-					v.erase(it3);//删除该终结符的所有产生式
-					it3--;
-					if(it2!=v.begin())
-						it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
-				}
-			}
-		}
-	}
-
-	while(v.size()!=0)
-	{
-		for(it2=v.begin();it2!=v.end();it2++)
-		{
-			vector<string> right = split((*it2).end);//拆分产生式右部
-			int right_size = right.size();
-			bool flag = false;
-			for(int j=0;j<right_size;j++)
-			{
-				if(empty[(string)right.at(j)]==0)//产生式右部含有终结符
-				{
-					flag = true;
-					break;
-				}
-				else if(empty[(string)right.at(j)]==1)
-				{
-					right.at(j)="";
-				}
-			}
-			for(int j=right_size-1;j>0;j--)
-				right.at(j-1) += right.at(j);
-			(*it2).end = right.at(0);
-			if((*it2).end=="")
-			{
-				string temp = (*it2).start;
-				empty[(string)(*it2).start] = 1;//能推出空
-				vector<form>::iterator it3;
-				for(it3=v.begin();it3!=v.end();it3++)
-				{
-					if((*it3).start==temp)
-					{
-						v.erase(it3);//删除该终结符的所有产生式
-						it3--;
-						if(it2!=v.begin())
-							it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
-					}
-				}
-			}
-			if(flag)
-			{
-				int count = 0;
-				vector<form>::iterator it4;
-				for(it4=v.begin();it4!=v.end();it4++)
-					if((*it4).start==(*it2).start)
-						count++;
-				if(count == 1)
-					empty[(string)(*it2).start] = 0;
-				v.erase(it2);
-				it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
-			}
-			
-		}
-	}
-	// //测试empty表是否正确
-	// map<string,int>::iterator it;
-	// for(it=empty.begin();it!=empty.end();it++)
-	// cout<<it->first<<":"<<it->second<<endl;
-	return empty;
+            if(vt.find(right.at(j))!=vt.end())//产生式右部含有终结符
+            {
+                flag = 1;
+                break;
+            }
+        }
+        if(flag==2)
+        	continue;
+        if(flag==1)
+        {
+            int count = 0;
+            vector<form>::iterator it4;
+            for(it4=v.begin();it4!=v.end();it4++)
+                if((*it4).start==(*it2).start)
+                    count++;
+            if(count == 1)
+                empty[(string)(*it2).start] = 0;
+            v.erase(it2);
+            it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
+        }
+    }
+    for(it2=v.begin();it2!=v.end();it2++)
+    {
+        if((*it2).end=="$")
+        {
+            string temp = (*it2).start;
+            empty[(string)(*it2).start] = 1;//能推出空
+            vector<form>::iterator it3;
+            for(it3=v.begin();it3!=v.end();it3++)
+            {
+                if((*it3).start==temp)
+                {
+                    v.erase(it3);//删除该终结符的所有产生式
+                    it3=v.begin();//it3--
+                    if(it2!=v.begin())
+                        it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
+                }
+            }
+        }
+    }
+    while(v.size()>0)
+    {
+        for(it2=v.begin();it2!=v.end();it2++)
+        {
+            vector<string> right = split((*it2).end);//拆分产生式右部
+            int right_size = right.size();
+            int flag = 0;
+            for(int j=0;j<right_size;j++)
+            {
+                if(empty[(string)right.at(j)]==0)//产生式右部不能推出空
+                {
+                    flag = 1;
+                    break;
+                }
+                else if(empty[(string)right.at(j)]==1)
+                {
+                    right.at(j)="";
+                }
+            }
+            if(flag==1)//此产生式不能推出空
+            {
+                int count = 0;
+                for(int k=0;k<v.size();k++)
+                    if(v.at(k).start==(*it2).start)
+                        count++;
+                if(count == 1)
+                    empty[(string)(*it2).start] = 0;
+                v.erase(it2);
+                it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
+                continue;
+            }
+            for(int j=right_size-1;j>0;j--)
+                right.at(j-1) += right.at(j);
+            (*it2).end = right.at(0);
+            if((*it2).end=="")
+            {
+                string temp = (*it2).start;
+                empty[(string)(*it2).start] = 1;//能推出空
+                vector<form>::iterator it3;
+                for(it3=v.begin();it3!=v.end();it3++)
+                {
+                    if((*it3).start==temp)
+                    {
+                        v.erase(it3);//删除该终结符的所有产生式
+                        it3=v.begin();//it3--
+                        if(it2!=v.begin())
+                            it2--;//因为删除了一个产生式,所以迭代器要前移,否则会错过后一个值
+                    }
+                }
+            }
+        }
+    }
+    // //测试empty表是否正确
+    // map<string,int>::iterator it;
+    // for(it=empty.begin();it!=empty.end();it++)
+    // cout<<it->first<<":"<<it->second<<endl;
+    return empty;
 }
 
 set<string> _union(const set<string > a , const set<string> b)//求并集
@@ -279,12 +329,17 @@ set<string> get_first(string symbol , set<string > vt , set<string > vn , vector
 				continue;
 			}
 			vector<string> right = split((*it).end);
+			if(symbol==(string)right.at(0))//递归,跳过
+				continue;
 			int right_size = right.size();
 			for(int i=0;i<right_size;i++)
 			{
 				if(result.find("$")!=result.end()&&flag==0)
 					result.erase("$");
-				result = _union(result , get_first(right.at(i) , vt , vn , f , empty));
+				if(symbol!=(string)right.at(i))
+					result = _union(result , get_first(right.at(i) , vt , vn , f , empty));
+				else
+					break;
 				if(empty[(string)right.at(i)]==0||vt.find(right.at(i))!=vt.end())
 					break;
 				else if(i==right_size-1)
@@ -401,6 +456,8 @@ set<project> make_closure(set<project> CI , vector<form> f , map<string,set<stri
 
 set<project> go_closure(string X , set<project> CI , vector<form> f , map<string,set<string> > first , map<string,int> empty)
 {
+	if(X=="")
+		return make_closure(CI,f,first,empty);
 	set<project> result;
 	set<project>::iterator it;
 	for(it=CI.begin();it!=CI.end();it++)
@@ -419,39 +476,33 @@ set<project> go_closure(string X , set<project> CI , vector<form> f , map<string
 	return result;
 }
 
-bool equal(set<project> a, set<project> b)
+int sum_dot(set<project> a)
 {
-	if(a.size()!=b.size())
-		return false;
-	set<project>::iterator it1,it2;
-	it1=a.begin();
-	it2=b.begin();
-	for(;it1!=a.end();)
+	set<project>::iterator it;
+	int sum = 0;
+	for(it=a.begin();it!=a.end();it++)
 	{
-		if((*it1).start!=(*it2).start)
-			return false;
-		else if((*it1).end!=(*it2).end)
-			return false;
-		else if((*it1).symbol!=(*it2).symbol)
-			return false;
-		else if((*it1).dot!=(*it2).dot)
-			return false;
+		sum += (*it).dot;
 	}
-	return true;
+	return sum;
 }
 
-bool contain(set<project> a, set<set<project> > b)
+table build_table(vector<form> f , map<string,set<string> > first , map<string,int> empty , set<string> vt , set<string> vn)//构造项目集族
 {
-	set<set<project> >::iterator it;
-	for(it=b.begin();it!=b.end();it++)
-		if(equal((*it),a))
-			return true;
-	return false;
-}
-
-vector<map<string,int> > build_C(vector<form> f , map<string,set<string> > first , map<string,int> empty , set<string> vt , set<string> vn)//构造项目集族
-{
-	vector<map<string,int> > action;
+	table tb;
+	tb.vv = _union(vn,vt);
+	tb.vv.insert("#");
+	tb.w = tb.vv.size();
+	for(int i=0;i<MAX_H;i++)
+		for(int j=0;j<tb.w;j++)
+			tb.fx[i][j].value=0;
+	set<string>::iterator it6;
+	int i_head = 0;
+	for(it6=tb.vv.begin();it6!=tb.vv.end();it6++)
+	{
+		tb.head[i_head] = (*it6);
+		i_head++;
+	}
 	vector<set<project> > C;//项目集族
 	set<set<project> > set_C;
 	set<project> I0;
@@ -468,89 +519,275 @@ vector<map<string,int> > build_C(vector<form> f , map<string,set<string> > first
 	for(int i=0;i<C.size();i++)
 	{
 		set<string> buf;
-		map<string,int> buf_action;
+		point buf_table[MAX_W];
 		set<project>::iterator it;
 		for(it=C.at(i).begin();it!=C.at(i).end();it++)
 		{
 			string temp = dot_right_one((*it).end,(*it).dot);
-			if(temp=="")
-				buf_action.insert(pair<string,int>((*it).symbol,-1));
+			if(temp=="")//归约
+			{
+				point tp;
+				tp.type = "r";
+				tp.value = 0;
+				tp.start = (*it).start;
+				tp.end = (*it).end;
+				if((*it).start=="X")
+					tp.type = "acc";
+				int index = 0;
+				for(int k=0;k<tb.w;k++)
+					if(tb.head[k]==(*it).symbol)
+					{
+						index = k;
+						break;
+					}
+				buf_table[index]=tp;
+				continue;
+			}
 			if(buf.find(temp)!=buf.end())
 				continue;//已经跳转过,避免重复计算
 			buf.insert(temp);
+			if((*it).dot==1 && (*it).start=="X" && (*it).end=="S")//接受
+			{
+				point tp;
+				tp.type = "acc";
+				tp.value = 0;
+				tp.start = (*it).start;
+				tp.end = (*it).end;
+				int index = 0;
+				for(int k=0;k<tb.w;k++)
+					if(tb.head[k]==(*it).symbol)
+					{
+						index = k;
+						break;
+					}
+				buf_table[index]=tp;
+				break;
+			}
 			set<project> J;
 			J = go_closure(temp,C.at(i),f,first,empty);
 
-			if(set_C.find(J)==set_C.end())//新的
+			if(set_C.find(J)==set_C.end()||sum_dot(*set_C.find(J)) != sum_dot(J))//新的
 			{
-				cout<<"i="<<i<<endl;
 				C.push_back(J);
 				set_C.insert(J);
-				if(vt.find(temp)!=vt.end())
-					buf_action.insert(pair<string,int>(temp,C.size()-1));
+
+				point tp;
+				tp.value = set_C.size()-1;
+				tp.start = (*it).start;
+				tp.end = (*it).end;
+				
+				if(vt.find(temp)!=vt.end())//ACTION
+					tp.type = "s";
+				else if(vn.find(temp)!=vn.end())
+					tp.type = "goto";
+				int index = 0;
+				for(int k=0;k<tb.w;k++)
+					if(tb.head[k]==temp)
+					{
+						index = k;
+						break;
+					}
+				buf_table[index]=tp;
+				
 				it=C.at(i).begin();//vector内存重新分配之后会导致迭代器失效!
 			}
+		}
+		// table.push_back(buf_table);
+		for(int px=0;px<tb.w;px++)
+		{
+			tb.fx[i][px]=buf_table[px];
+			buf_table[px].value = 0;
+		}
+	}
+	tb.h = C.size();
+	return tb;
+}
+
+void print_table(table &tb)
+{
+	cout<<"============================================TABLE============================================"<<endl;
+	cout<<"h="<<tb.h<<"  w="<<tb.w<<endl;
+	int step=0;
+	cout<<setw(6)<<"step";
+	for(int i=0;i<tb.vv.size();i++)
+	{
+		cout<<setw(10)<<tb.head[i];
+	}
+	cout<<endl;
+	for(int i=0;i<tb.h;i++)
+	{
+		cout<<setw(6)<<step++;
+		for(int j=0;j<tb.w;j++)
+		{
+			//if(tb.fx[i][j].type=="r")
+			
+			if(tb.fx[i][j].type!="")
+				cout<<setw(10)<<tb.fx[i][j].type<<tb.fx[i][j].value;
 			else
+				cout<<setw(10)<<"[ ]";
+		}
+		cout<<endl;
+	}
+	cout<<"============================================TABLE============================================"<<endl;
+}
+
+bool analysis(table &tb, string _str)//分析函数
+{
+	stack<int> status;//状态栈
+	status.push(0);
+	stack<string> str = str_stack(_str);//输入串
+	stack<string> symbol;//符号栈
+	symbol.push("#");
+	int i=0,j=0;
+	for(j=0;j<tb.w;j++)
+	{
+		if(tb.head[j]==str.top())
+			break;
+	}
+	cout<<setw(5)<<"step"<<setw(20)<<"status"<<setw(20)<<"symbol"<<setw(20)<<"string"<<setw(20)<<"ACTION"<<endl;
+	int step=0;
+	while(tb.fx[i][j].type!="acc")
+	{
+		
+		stack<int> copy_status;
+		copy_status = status;
+		cout<<setw(5)<<step++;
+		cout<<setw(10);
+		for(int k=0;k<status.size();k++)
+		{
+			cout<<copy_status.top();
+			copy_status.pop();
+		}
+		cout<<"#"<<setw(10);
+		stack<string> copy_symbol;
+		copy_symbol = symbol;
+		for(int k=0;k<symbol.size();k++)
+		{
+			cout<<copy_symbol.top();
+			copy_symbol.pop();
+		}
+		cout<<setw(10);
+		stack<string> copy_string;
+		copy_string = str;
+		for(int k=0;k<str.size();k++)
+		{
+			cout<<copy_string.top();
+			copy_string.pop();
+		}
+		if(tb.fx[i][j].value==0)
+			cout<<setw(10)<<tb.fx[i][j].type<<endl;
+		else
+			cout<<setw(10)<<tb.fx[i][j].type<<tb.fx[i][j].value<<endl;
+		if(tb.fx[i][j].type=="s")
+		{
+			status.push(tb.fx[i][j].value);
+			symbol.push(str.top());
+			str.pop();
+			i = tb.fx[i][j].value;
+			for(j=0;j<tb.w;j++)
 			{
-				for(int j=0;j<C.size();j++)
-					if(C.at(j)==J)
-						buf_action.insert(pair<string,int>(temp,j));
+				if(tb.head[j]==str.top())
+					break;
 			}
 		}
-		action.push_back(buf_action);
+		else if(tb.fx[i][j].type=="r")
+		{
+			int _size = tb.fx[i][j].end.size();
+			for(int k=0;k<_size;k++)
+			{
+				symbol.pop();
+				status.pop();
+			}
+			symbol.push(tb.fx[i][j].start);
+			i = status.top();
+			for(j=0;j<tb.w;j++)
+				if(tb.head[j]==symbol.top())
+				{
+					status.push(tb.fx[i][j].value);
+					break;
+				}
+			i = tb.fx[i][j].value;
+			for(j=0;j<tb.w;j++)
+			{
+				if(tb.head[j]==str.top())
+					break;
+			}
+			// cout<<"i="<<i<<" j="<<j<<endl;
+		}
+		else
+			return false;
 	}
-	set<project>::iterator it;
-	it=C[4].begin();
-	cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<"  dot="<<(*it).dot<<endl;
-	return action;
+	return true;
+}
+
+string get_input(vector<word> &token)
+{
+	string result = "";
+	for(int i=0;i<token.size()-1;i++)
+	{
+		if(token.at(i).type==1)//key word
+		{
+			if(token.at(i).value=="cin")
+				result += "n";
+			else if(token.at(i).value=="cout")
+				result += "u";
+			else if(token.at(i).value=="int")
+				result += "t";
+			else if(token.at(i).value=="if")
+				result += "r";
+			else if(token.at(i).value=="else")
+				result += "e";
+			else if(token.at(i).value=="double")
+				result += "d";
+			else if(token.at(i).value=="endl")
+				result += "k";
+			else if(token.at(i).value=="for")
+				result += "f";
+			else 
+				result +="*";//预留更改
+		}
+		else if(token.at(i).type==2)//identifier
+		{
+			result += "i";
+		}
+		else if(token.at(i).type==3)//operator
+		{
+			if(token.at(i).value.size()>1)
+				result += "~";
+			else
+				result += token.at(i).value;
+		}
+		else if(token.at(i).type==4)//limiter
+		{
+			result += token.at(i).value;
+		}
+		else if(token.at(i).type==5)//const
+		{
+			result += "c";
+		}
+		else
+			cout<<"The token table is error!"<<endl;
+	}
+	result += "#";
+	return result;
 }
 
 int main()
 {
-	char s[] = "input_grammar.txt";
-	vector<form> v = read_grammar(s);
-	set<string> vt = find_vt(v);
-	set<string> vn = find_vn(v);
-	map<string,int> empty = get_empty(v);
-	map<string,set<string> > first,follow,select;
-	first = make_first(vt,vn,v,empty);
-
-	vector<map<string,int> > action;
-	vector<map<string,int> > go_to;
-	action = build_C(v, first, empty, vt, vn);
-	cout<<"size:"<<action.size()<<endl<<endl;
-	for(int i=0;i<action.size();i++)
-	{
-		cout<<"line:"<<i<<"   ";
-		map<string,int>::iterator it;
-	    for(it=action.at(i).begin();it!=action.at(i).end();++it)
-	    {
-	        cout<<"key: "<<it->first <<" value: "<<it->second<<endl;
-	    }
-	    cout<<endl;
-	}
-
-
-
-
-
-	// project I;
-	// I.start="X";
-	// I.dot=0;
-	// I.end="S";
-	// I.symbol="#";
-	// set<project> CI0;
-	// CI0.insert(I);
-	// CI0 = make_closure(CI0,v,first,empty);
-	// //CI0 = go_closure("b",CI0,v,first,empty);
-
-	// cout<<"main:"<<endl;
-	// set<project>::iterator it;
-	// for(it=CI0.begin();it!=CI0.end();it++)
-	// 	cout<<(*it).start<<"->"<<(*it).end<<","<<(*it).symbol<<":"<<(*it).dot<<endl;
-
-	// set<string>::iterator it;
-	// for(it=first["D"].begin();it!=first["D"].end();it++)
-	// 	cout<<*it<<" ";
+	char s1[] = "input_grammar.txt";//2型文法路径
+	char s2[] = "token_table.txt";//第一步生成的token表路径
+	vector<form> v = read_grammar(s1);//从文件读取产生式
+	set<string> vt = find_vt(v);//找出所有终结符
+	set<string> vn = find_vn(v);//找出所有非终结符
+	map<string,int> empty = get_empty(v);//构造可以推出空的非终结符表
+	map<string,set<string> > first = make_first(vt,vn,v,empty);//构造FIRST集
+	table tb = build_table(v,first,empty,vt,vn);//构造LR(1)分析表
+	// print_table(tb);//预测打印分析表
+	vector<word> token = read_token(s2);//读取生成的token表
+	string input_str = get_input(token);//根据token表生成待查串
+	if(analysis(tb, input_str))//进行LR(1)分析
+		cout<<"\nacc!\n\n";
+	else
+		cout<<"\nerror!\n\n";
 	return 0;
 }

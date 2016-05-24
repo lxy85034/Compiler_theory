@@ -320,7 +320,7 @@ bool is_const(char s[])
 
 bool is_key_word(string s)
 {
-	if(s=="int"||s=="for"||s=="double"||s=="#include"||s=="using"||s=="namespace"||s=="std"||s=="return"||s=="main"||s=="void"||s=="endl"||s=="cout"||s=="cin")
+	if(s=="int"||s=="for"||s=="double"||s=="if"||s=="else"||s=="namespace"||s=="std"||s=="return"||s=="main"||s=="void"||s=="endl"||s=="cout"||s=="cin")
 		return true;
 	return false;
 }
@@ -345,7 +345,7 @@ bool is_limiter(string s)
 
 bool is_operator(string s)
 {
-	if(s=="+"||s=="-"||s=="++"||s=="<"||s==">"||s=="*"||s=="--"||s==">="||s=="<="||s=="="||s=="\""||s=="+="||s=="<<"||s==">>")
+	if(s=="+"||s=="-"||s=="++"||s=="<"||s==">"||s=="*"||s=="--"||s==">="||s=="<="||s=="="||s=="\""||s=="+="||s=="<<"||s==">>"||s=="-=")
 		return true;
 	return false;
 }
